@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+beanie
+motor
+python-dotenv
+jinja2
+python-multipart
+pydantic
+requests

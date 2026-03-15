@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{{ city }} 机厅列表 - 菌菌太鼓机厅收集{% endblock %}
+
+{% block content %}
+<div class="store-list-header">
+    <div style="margin-bottom: 0.8rem;">
+        <a href="/" style="color: var(--primary-color); text-decoration: none;">&larr; 返回地区列表</a>
+    </div>
+    <h1 style="font-size: 1.8rem;">[[ city ]] <span style="font-size: 0.6em; color: var(--text-muted); font-weight: normal;">[[ province ]]</span></h1>
+    
+    <div style="margin-top: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <span style="font-size: 0.9rem; color: var(--text-muted);">筛选:</span>
+        
+        <button 
+            @click="selectedDistrict = ''" 
+            :style="selectedDistrict === '' ? {background: 'var(--primary-color)', color: 'white'} : {background: 'white', border: '1px solid #ddd'}"
+            style="padding: 0.5rem 1rem; border-radius: 20px; cursor: pointer; font-size: 1rem; transition: all 0.2s;">
+            全部
+        </button>
+        
+        <button 
+            v-for="district in districts" 
+            :key="district"
+            @click="selectedDistrict = district"
+            :style="selectedDistrict === district ? {background: 'var(--primary-color)', color: 'white'} : {background: 'white', border: '1px solid #ddd'}"
+            style="padding: 0.5rem 1rem; border-radius: 20px; cursor: pointer; font-size: 1rem; transition: all 0.2s;">
+            [[ district ]]
+        </button>
+    </div>
+    
+    <div v-if="selectedDistrict" style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+        当前筛选: <span style="color: var(--primary-color);">[[ selectedDistrict ]]</span>
+        <span style="margin-left: 0.5rem; cursor: pointer; text-decoration: underline;" @click="selectedDistrict = ''">清除</span>
+    </div>
+</div>
+
+<div class="store-grid">
+    <a v-for="store in filteredStores" :key="store._id" :href="'/store/' + store._id" class="card store-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <h2 style="font-size: 1.4rem; margin-bottom: 0.5rem;">[[ store.store_name ]]</h2>
+            <span v-if="store.available === false" 
+                  style="background: #eceff1; color: #546e7a; font-size: 0.85rem; padding: 3px 3px; border-radius: 4px;">
+                已撤机
+            </span>
+        </div>
+        
+        <div class="store-info" style="color: #666; font-size: 1.05rem; margin-bottom: 0.5rem;">
+            [[ store.district || '' ]] [[ store.address || '地址未知' ]]
+        </div>
+        
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <span class="tag" style="background-color: #e3f2fd; color: #1565c0; font-size: 0.95rem;" v-if="store.cab_count && store.cab_count !== -1">
+                [[ store.cab_count ]] 台
+            </span>
+            <!-- <span class="tag" style="background-color: #e3f2fd; color: #1565c0; font-size: 0.95rem;" v-else-if="store.cab_count === -1">
+                机台数未知
+            </span> -->
+            <span class="tag" style="background-color: #f3e5f5; color: #7b1fa2; font-size: 0.95rem;" v-if="store.price_range">
+                [[ store.price_range ]]
+            </span>
+        </div>
+    </a>
+    
+    <div v-if="filteredStores.length === 0" style="padding: 3rem; text-align: center; color: var(--text-muted);">
+        暂无符合条件的机厅
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const storesData = {{ stores | tojson | safe }};
+    const districtsData = {{ districts | tojson | safe }};
+    const provinceName = "{{ province }}";
+    const cityName = "{{ city }}";
+
+    Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data() {
+            return {
+                stores: storesData,
+                districts: districtsData,
+                province: provinceName,
+                city: cityName,
+                selectedDistrict: ''
+            }
+        },
+        computed: {
+            filteredStores() {
+                let result = this.stores;
+                
+                if (this.selectedDistrict) {
+                    result = result.filter(s => s.district === this.selectedDistrict);
+                }
+                
+                return result;
+            }
+        }
+    }).mount('#app');
+</script>
+{% endblock %}

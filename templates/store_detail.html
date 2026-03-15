@@ -1,0 +1,637 @@
+{% extends "base.html" %}
+
+{% block title %}{{ store.store_name }} - 菌菌太鼓机厅收集{% endblock %}
+
+{% block content %}
+<div class="detail-header">
+    <div style="margin-bottom: 0.8rem;">
+        <a :href="backLink" style="color: var(--primary-color); text-decoration: none;">&larr; 返回 [[ store.city ]] 列表</a>
+    </div>
+    
+    <div style="display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;">
+        <h1 style="font-size: 1.8rem; line-height: 1.2; margin: 0;">[[ store.store_name ]]</h1>
+        <!-- <span class="tag" style="font-size: 1rem; padding: 0.3rem 0.8rem; background: #e3f2fd; color: #1565c0;">
+            [[ (store.cab_count === -1) ? '机台数未知' : (store.cab_count + ' 台') ]]
+        </span> -->
+        <span v-if="store.available === false" class="tag" style="background: #eceff1; color: #546e7a; font-size: 1rem; padding: 0.3rem 0.8rem;">
+            已撤机
+        </span>
+    </div>
+    <div style="margin-top: 0.3rem; color: var(--text-muted); font-size: 1rem;">
+        [[ store.province ]] · [[ store.city ]] · [[ store.district ]]
+    </div>
+    
+    <div class="store-info-grid">
+        <div class="card store-info-card">
+            <div class="address-row">
+                <span class="info-label">地址</span>
+                <div class="info-value">[[ store.address || '暂无信息' ]]</div>
+            </div>
+            <div class="info-row">
+                <span class="info-label">营业</span>
+                <div class="info-value">[[ store.business_hours || '暂无信息' ]]</div>
+                <span class="info-label">价格</span>
+                <div class="info-value">[[ store.price_range || '暂无信息' ]]</div>
+                <span class="info-label">本地群</span>
+                <div class="info-value">[[ store.local_group || '暂无信息' ]]</div>
+            </div>
+        </div>
+        
+        <div class="store-actions">
+            <div class="card rating-card">
+                <div class="rating-row">
+                    <div class="rating-item">
+                        <div class="rating-label">机况评分</div>
+                        <div class="rating-score">[[ conditionAvg ]]</div>
+                        <div class="rating-count">[[ store.condition_rating_count || 0 ]] 人</div>
+                    </div>
+                    <div class="rating-item">
+                        <div class="rating-label">推荐指数</div>
+                        <div class="rating-score recommend">[[ recommendAvg ]]</div>
+                        <div class="rating-count">[[ store.recommendation_rating_count || 0 ]] 人</div>
+                    </div>
+                    <div @click="showRate = !showRate" class="rating-toggle">
+                        [[ showRate ? '收起' : '评分' ]]
+                    </div>
+                </div>
+                <div v-show="showRate" class="rating-form">
+                    <form :action="'/store/' + (store.id || store._id) + '/rate'" method="post">
+                        <div class="score-section">
+                            <label>机况 (0-5)</label>
+                            <div class="score-options">
+                                <label v-for="i in 6" :key="'c'+i">
+                                    <input type="radio" name="condition_score" :value="i-1" required>
+                                    <div>[[ i-1 ]]</div>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="score-section">
+                            <label>推荐 (0-5)</label>
+                            <div class="score-options recommend-options">
+                                <label v-for="i in 6" :key="'r'+i">
+                                    <input type="radio" name="recommendation_score" :value="i-1" required>
+                                    <div>[[ i-1 ]]</div>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="token-input">
+                            <input type="text" name="token" v-model="token" required placeholder="Token">
+                            <button type="submit">提交</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card map-card" v-if="store.lat && store.lng">
+                <div class="map-links">
+                    <a :href="mapUrl" target="_blank" class="map-link amap">高德</a>
+                    <a :href="qqMapUrl" target="_blank" class="map-link qqmap">腾讯</a>
+                    <a :href="baiduMapUrl" target="_blank" class="map-link baidumap">百度</a>
+                </div>
+            </div>
+            
+            <button @click="showEdit = !showEdit" class="edit-btn">
+                [[ showEdit ? '取消修改' : '修改信息' ]]
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Store Form -->
+<div v-show="showEdit" class="card edit-form-card">
+    <h3 style="margin-bottom: 0.6rem;">修改机厅信息</h3>
+    <form :action="'/store/' + (store.id || store._id) + '/edit'" method="post">
+        <div class="edit-form-grid">
+            <div class="edit-form-item">
+                <label>机厅名称</label>
+                <input type="text" name="store_name" v-model="form.store_name" required>
+            </div>
+            
+            <div class="edit-form-item">
+                <label>地址 (修改将重新获取坐标)</label>
+                <input type="text" name="address" v-model="form.address" required>
+            </div>
+
+            <div class="edit-form-item">
+                <label>价格/币数</label>
+                <input type="text" name="price_range" v-model="form.price_range">
+            </div>
+
+            <div class="edit-form-item">
+                <label>营业时间</label>
+                <input type="text" name="business_hours" v-model="form.business_hours">
+            </div>
+
+            <div class="edit-form-item">
+                <label>本地群</label>
+                <input type="text" name="local_group" v-model="form.local_group" placeholder="QQ群号">
+            </div>
+
+            <div class="edit-form-item">
+                <label>机台数量</label>
+                <input type="number" name="cab_count" v-model="form.cab_count">
+            </div>
+            
+            <div class="edit-form-item">
+                <label>状态</label>
+                <select name="available" v-model="form.available">
+                    <option :value="true">营业中</option>
+                    <option :value="false">已撤机</option>
+                </select>
+            </div>
+        </div>
+        <div class="edit-token-section">
+            <label>操作Token (必填)</label>
+            <input type="text" name="token" v-model="token" @input="saveToken" required placeholder="请输入操作Token">
+            <div class="token-hint">Token将自动保存到本地</div>
+        </div>
+        
+        <button type="submit" class="submit-btn">保存修改</button>
+    </form>
+
+    <div class="danger-zone">
+        <h3>危险操作</h3>
+        <p>删除操作将永久移除该机厅信息，不可撤销。</p>
+        
+        <form :action="'/store/' + (store.id || store._id) + '/delete'" method="post" @submit="confirmDelete">
+            <input type="hidden" name="token" :value="token">
+            <button type="submit" class="delete-btn">🗑️ 删除此机厅</button>
+        </form>
+    </div>
+</div>
+
+<!-- Drum List -->
+<div style="margin-top: 2rem;">
+    <h3 style="margin-bottom: 1rem;">框体列表 <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">共 [[ drums.length ]] 台</span></h3>
+    
+    <div v-if="drums.length === 0" style="padding: 2rem; text-align: center; color: var(--text-muted); background: #f5f5f5; border-radius: 8px;">
+        暂无鼓框体信息，点击下方"添加鼓框体"来录入
+    </div>
+    
+    <div class="drum-grid">
+        <div v-for="drum in drums" :key="drum._id" class="map-drum-list">
+            <div class="list-border">
+                <div :class="'list ' + getFrameClass(drum)">
+                    <div style="display: flex; gap: 1rem;">
+                        <div style="flex-shrink: 0;">
+                            <div class="drumbox inline-box">
+                                <div class="map-drum-right">
+                                    <span class="drum drumbg"></span>
+                                    <span :class="'drum x-l ' + getDrumFace(drum, '2p', 'x-l')"></span>
+                                    <span :class="'drum x-r ' + getDrumFace(drum, '2p', 'x-r')"></span>
+                                <span :class="'drum o-l ' + getDrumFace(drum, '2p', 'o-l')"></span>
+                                <span :class="'drum o-r ' + getDrumFace(drum, '2p', 'o-r')"></span>
+                            </div>
+                            <div class="map-drum-left">
+                                <span class="drum drumbg"></span>
+                                <span :class="'drum x-l ' + getDrumFace(drum, '1p', 'x-l')"></span>
+                                <span :class="'drum x-r ' + getDrumFace(drum, '1p', 'x-r')"></span>
+                                <span :class="'drum o-l ' + getDrumFace(drum, '1p', 'o-l')"></span>
+                                <span :class="'drum o-r ' + getDrumFace(drum, '1p', 'o-r')"></span>
+                            </div>
+                            <span class="volume-l" aria-hidden="true">[[ getAudioEmoji(drum.p1_audio) ]]</span>
+                            <span class="volume-r" aria-hidden="true">[[ getAudioEmoji(drum.p2_audio) ]]</span>
+                            <div :class="'drum-screen ' + drum.screen"></div>
+                        </div>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <p style="margin-bottom: 0.3rem;">[[ getScreenExp(drum.screen) ]]</p>
+                        <p style="margin-bottom: 0.3rem;">[[ getAudioDesc(drum.p1_audio, drum.p2_audio) ]]</p>
+                        <p style="margin-bottom: 0.3rem;" v-if="drum.comm">其他信息：[[ drum.comm ]]</p>
+                        <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                            鼓况有误？
+                            <button type="button" @click="startEditDrum(drum)" style="background: #9e9e9e; color: white; border: none; padding: 2px 8px; border-radius: 2px; cursor: pointer; font-size: 0.85rem;">
+                                点此变更鼓况
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div v-if="editingDrumId === drum._id" class="card" style="margin-top: 0.5rem; padding: 1rem; background: #fafafa;">
+                <form :action="'/store/' + (store.id || store._id) + '/drum/' + drum._id + '/edit'" method="post">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <div>
+                            <h5 style="color: #1976d2; margin-bottom: 0.5rem;">1P 侧</h5>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem;">
+                                <select name="p1_x_l" v-model="editDrumData.p1_x_l" style="padding: 0.3rem;">
+                                    <option v-for="opt in drumConditionOptions" :key="opt.value" :value="opt.value">[[ opt.value === '' ? '左咔' : opt.label ]]</option>
+                                </select>
+                                <select name="p1_x_r" v-model="editDrumData.p1_x_r" style="padding: 0.3rem;">
+                                    <option v-for="opt in drumConditionOptions" :key="opt.value" :value="opt.value">[[ opt.value === '' ? '右咔' : opt.label ]]</option>
+                                </select>
+                                <select name="p1_o_l" v-model="editDrumData.p1_o_l" style="padding: 0.3rem;">
+                                    <option v-for="opt in drumConditionOptions" :key="opt.value" :value="opt.value">[[ opt.value === '' ? '左咚' : opt.label ]]</option>
+                                </select>
+                                <select name="p1_o_r" v-model="editDrumData.p1_o_r" style="padding: 0.3rem;">
+                                    <option v-for="opt in drumConditionOptions" :key="opt.value" :value="opt.value">[[ opt.value === '' ? '右咚' : opt.label ]]</option>
+                                </select>
+                            </div>
+                            <div style="margin-top: 0.5rem;">
+                                <label style="font-size: 0.8rem;">音量</label>
+                                <select name="p1_audio" v-model="editDrumData.p1_audio" style="width: 100%; padding: 0.3rem;">
+                                    <option v-for="opt in audioOptions" :key="opt.value" :value="opt.value">[[ opt.label ]]</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <h5 style="color: #d32f2f; margin-bottom: 0.5rem;">2P 侧</h5>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem;">
+                                <select name="p2_x_l" v-model="editDrumData.p2_x_l" style="padding: 0.3rem;">
+                                    <option v-for="opt in drumConditionOptions" :key="opt.value" :value="opt.value">[[ opt.value === '' ? '左咔' : opt.label ]]</option>
+                                </select>
+                                <select name="p2_x_r" v-model="editDrumData.p2_x_r" style="padding: 0.3rem;">
+                                    <option v-for="opt in drumConditionOptions" :key="opt.value" :value="opt.value">[[ opt.value === '' ? '右咔' : opt.label ]]</option>
+                                </select>
+                                <select name="p2_o_l" v-model="editDrumData.p2_o_l" style="padding: 0.3rem;">
+                                    <option v-for="opt in drumConditionOptions" :key="opt.value" :value="opt.value">[[ opt.value === '' ? '左咚' : opt.label ]]</option>
+                                </select>
+                                <select name="p2_o_r" v-model="editDrumData.p2_o_r" style="padding: 0.3rem;">
+                                    <option v-for="opt in drumConditionOptions" :key="opt.value" :value="opt.value">[[ opt.value === '' ? '右咚' : opt.label ]]</option>
+                                </select>
+                            </div>
+                            <div style="margin-top: 0.5rem;">
+                                <label style="font-size: 0.8rem;">音量</label>
+                                <select name="p2_audio" v-model="editDrumData.p2_audio" style="width: 100%; padding: 0.3rem;">
+                                    <option v-for="opt in audioOptions" :key="opt.value" :value="opt.value">[[ opt.label ]]</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                        <div>
+                            <label style="font-size: 0.8rem;">屏幕</label>
+                            <select name="screen" v-model="editDrumData.screen" style="width: 100%; padding: 0.4rem;">
+                                <option v-for="opt in screenOptions" :key="opt.value" :value="opt.value">[[ opt.label ]]</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.8rem;">机台编号</label>
+                            <input type="number" name="track_no" v-model="editDrumData.track_no" style="width: 100%; padding: 0.4rem;">
+                        </div>
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        <label style="font-size: 0.8rem;">备注</label>
+                        <input type="text" name="comm" v-model="editDrumData.comm" style="width: 100%; padding: 0.4rem;">
+                    </div>
+                    <div style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                        <button type="submit" style="background: #4caf50; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">保存修改</button>
+                        <input type="text" name="token" v-model="token" @input="saveToken" required placeholder="Token" class="token-input-inline">
+                        <button type="button" @click="deleteDrum(drum._id)" style="background: #f44336; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">删除</button>
+                        <button type="button" @click="editingDrumId = null" style="background: #9e9e9e; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">取消</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Drum Button -->
+    <div class="add-drum-btn" @click="showAddDrum = !showAddDrum">
+        <span>➕ 添加框体</span>
+    </div>
+    
+    <!-- Add Drum Form -->
+    <div v-if="showAddDrum" class="card add-drum-form">
+        <h3 style="margin-bottom: 0.6rem;">添加鼓框体</h3>
+        <form :action="'/store/' + (store.id || store._id) + '/drum/add'" method="post">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                <div>
+                    <h5 style="color: #1976d2; margin-bottom: 0.5rem;">1P 侧</h5>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem;">
+                        <select name="p1_x_l" style="padding: 0.3rem;">
+                            <option v-for="opt in drumConditionOptionsAdd" :key="opt.value" :value="opt.value" :selected="opt.value === 'nom'">[[ opt.value === 'nom' ? '左咔' : opt.label ]]</option>
+                        </select>
+                        <select name="p1_x_r" style="padding: 0.3rem;">
+                            <option v-for="opt in drumConditionOptionsAdd" :key="opt.value" :value="opt.value" :selected="opt.value === 'nom'">[[ opt.value === 'nom' ? '右咔' : opt.label ]]</option>
+                        </select>
+                        <select name="p1_o_l" style="padding: 0.3rem;">
+                            <option v-for="opt in drumConditionOptionsAdd" :key="opt.value" :value="opt.value" :selected="opt.value === 'nom'">[[ opt.value === 'nom' ? '左咚' : opt.label ]]</option>
+                        </select>
+                        <select name="p1_o_r" style="padding: 0.3rem;">
+                            <option v-for="opt in drumConditionOptionsAdd" :key="opt.value" :value="opt.value" :selected="opt.value === 'nom'">[[ opt.value === 'nom' ? '右咚' : opt.label ]]</option>
+                        </select>
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <label style="font-size: 0.8rem;">音量</label>
+                        <select name="p1_audio" style="width: 100%; padding: 0.3rem;">
+                            <option v-for="opt in audioOptionsAdd" :key="opt.value" :value="opt.value" :selected="opt.value === 4">[[ opt.label ]]</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <h5 style="color: #d32f2f; margin-bottom: 0.5rem;">2P 侧</h5>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem;">
+                        <select name="p2_x_l" style="padding: 0.3rem;">
+                            <option v-for="opt in drumConditionOptionsAdd" :key="opt.value" :value="opt.value" :selected="opt.value === 'nom'">[[ opt.value === 'nom' ? '左咔' : opt.label ]]</option>
+                        </select>
+                        <select name="p2_x_r" style="padding: 0.3rem;">
+                            <option v-for="opt in drumConditionOptionsAdd" :key="opt.value" :value="opt.value" :selected="opt.value === 'nom'">[[ opt.value === 'nom' ? '右咔' : opt.label ]]</option>
+                        </select>
+                        <select name="p2_o_l" style="padding: 0.3rem;">
+                            <option v-for="opt in drumConditionOptionsAdd" :key="opt.value" :value="opt.value" :selected="opt.value === 'nom'">[[ opt.value === 'nom' ? '左咚' : opt.label ]]</option>
+                        </select>
+                        <select name="p2_o_r" style="padding: 0.3rem;">
+                            <option v-for="opt in drumConditionOptionsAdd" :key="opt.value" :value="opt.value" :selected="opt.value === 'nom'">[[ opt.value === 'nom' ? '右咚' : opt.label ]]</option>
+                        </select>
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <label style="font-size: 0.8rem;">音量</label>
+                        <select name="p2_audio" style="width: 100%; padding: 0.3rem;">
+                            <option v-for="opt in audioOptionsAdd" :key="opt.value" :value="opt.value" :selected="opt.value === 4">[[ opt.label ]]</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div>
+                    <label style="font-size: 0.8rem;">屏幕</label>
+                    <select name="screen" style="width: 100%; padding: 0.4rem;">
+                        <option v-for="opt in screenOptions" :key="opt.value" :value="opt.value">[[ opt.label ]]</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.8rem;">机台编号</label>
+                    <input type="number" name="track_no" value="1" style="width: 100%; padding: 0.4rem;">
+                </div>
+            </div>
+            <div style="margin-top: 1rem;">
+                <label style="font-size: 0.8rem;">备注</label>
+                <input type="text" name="comm" placeholder="其他信息..." style="width: 100%; padding: 0.4rem;">
+            </div>
+            <div class="edit-token-section">
+                <label>操作Token (必填)</label>
+                <input type="text" name="token" v-model="token" @input="saveToken" required placeholder="请输入操作Token">
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                <button type="submit" style="background: #4caf50; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">添加框体</button>
+                <button type="button" @click="showAddDrum = false" style="background: #9e9e9e; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Hidden form for drum deletion -->
+<form id="deleteDrumForm" method="POST" style="display: none;">
+    <input type="hidden" name="token" v-model="token">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const storeData = {{ store | tojson | safe }};
+    const drumsData = {{ drums | tojson | safe }};
+
+    const SCREEN_MAP = {
+        'nom': '屏幕：普通',
+        'c-y': '屏幕：偏黄',
+        'c-b': '屏幕：偏蓝',
+        'c-p': '屏幕：偏紫',
+        'streched': '屏幕：拉伸',
+        'un-contrast': '屏幕：低对比度',
+        'cut': '屏幕：切边',
+        'bright': '屏幕：过亮',
+        'dark': '屏幕：过暗',
+        'hor-w': '屏幕：横白条纹',
+        'hor-b': '屏幕：横黑条纹',
+        'ver-w': '屏幕：竖白条纹',
+        'ver-b': '屏幕：竖黑条纹',
+        'blur': '屏幕：模糊'
+    };
+
+    const COND_TEXT_MAP = {
+        'gold': '金',
+        'good': '良',
+        'good-': '良-',
+        'nom': '可',
+        'nom-': '可-',
+        'bad': '不可'
+    };
+
+    const COND_COLOR_MAP = {
+        'gold': '#fec900',
+        'good': '#4caf50',
+        'good-': '#8bc34a',
+        'nom': '#ff9800',
+        'nom-': '#ff5722',
+        'bad': '#f44336'
+    };
+
+    const DRUM_FACE_MAP = {
+        '1p': { 'x-l': 'p1_x_l', 'o-l': 'p1_o_l', 'o-r': 'p1_o_r', 'x-r': 'p1_x_r' },
+        '2p': { 'x-l': 'p2_x_l', 'o-l': 'p2_o_l', 'o-r': 'p2_o_r', 'x-r': 'p2_x_r' }
+    };
+
+    Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data() {
+            return {
+                store: storeData,
+                drums: drumsData,
+                showEdit: false,
+                showAddDrum: false,
+                showRate: false,
+                editingDrumId: null,
+                token: '',
+                drumConditionOptions: [
+                    { value: '', label: '咔/咚' },
+                    { value: 'gold', label: '金' },
+                    { value: 'good', label: '良' },
+                    { value: 'good-', label: '良-' },
+                    { value: 'nom', label: '可' },
+                    { value: 'nom-', label: '可-' },
+                    { value: 'bad', label: '不可' }
+                ],
+                drumConditionOptionsAdd: [
+                    { value: 'nom', label: '咔/咚' },
+                    { value: 'gold', label: '金' },
+                    { value: 'good', label: '良' },
+                    { value: 'good-', label: '良-' },
+                    { value: 'nom-', label: '可-' },
+                    { value: 'bad', label: '不可' }
+                ],
+                audioOptions: [
+                    { value: -1, label: '无声' },
+                    { value: 0, label: '暂无信息' },
+                    { value: 2, label: '小' },
+                    { value: 4, label: '中' },
+                    { value: 6, label: '大' }
+                ],
+                audioOptionsAdd: [
+                    { value: -1, label: '无声' },
+                    { value: 2, label: '小' },
+                    { value: 4, label: '中' },
+                    { value: 6, label: '大' }
+                ],
+                screenOptions: [
+                    { value: 'nom', label: '普通' },
+                    { value: 'c-y', label: '黄' },
+                    { value: 'c-b', label: '蓝' },
+                    { value: 'c-p', label: '紫' },
+                    { value: 'streched', label: '拉伸' },
+                    { value: 'un-contrast', label: '低对比' },
+                    { value: 'cut', label: '切边' },
+                    { value: 'bright', label: '过亮' },
+                    { value: 'dark', label: '过暗' },
+                    { value: 'hor-w', label: '横白条纹' },
+                    { value: 'hor-b', label: '横黑条纹' },
+                    { value: 'ver-w', label: '竖白条纹' },
+                    { value: 'ver-b', label: '竖黑条纹' },
+                    { value: 'blur', label: '模糊' }
+                ],
+                editDrumData: {
+                    p1_o_l: '',
+                    p1_x_l: '',
+                    p1_o_r: '',
+                    p1_x_r: '',
+                    p1_audio: 4,
+                    p2_o_l: '',
+                    p2_x_l: '',
+                    p2_o_r: '',
+                    p2_x_r: '',
+                    p2_audio: 4,
+                    screen: 'nom',
+                    track_no: 1,
+                    comm: ''
+                },
+                form: {
+                    store_name: storeData.store_name,
+                    address: storeData.address,
+                    price_range: storeData.price_range,
+                    business_hours: storeData.business_hours,
+                    local_group: storeData.local_group,
+                    cab_count: storeData.cab_count,
+                    available: storeData.available
+                }
+            }
+        },
+        mounted() {
+            const savedToken = localStorage.getItem('kinoko_action_token');
+            if (savedToken) {
+                this.token = savedToken;
+            }
+        },
+        computed: {
+            conditionAvg() {
+                if (!this.store.condition_rating_count || this.store.condition_rating_count === 0) return 'N/A';
+                return (this.store.total_condition_score / this.store.condition_rating_count).toFixed(1);
+            },
+            recommendAvg() {
+                if (!this.store.recommendation_rating_count || this.store.recommendation_rating_count === 0) return 'N/A';
+                return (this.store.total_recommendation_score / this.store.recommendation_rating_count).toFixed(1);
+            },
+            backLink() {
+                if (this.store.province && this.store.city) {
+                    return `/city/${encodeURIComponent(this.store.province)}/${encodeURIComponent(this.store.city)}`;
+                }
+                return '/';
+            },
+            mapUrl() {
+                return `https://uri.amap.com/marker?position=${this.store.lng},${this.store.lat}&name=${encodeURIComponent(this.store.store_name)}`;
+            },
+            qqMapUrl() {
+                return `https://apis.map.qq.com/uri/v1/marker?marker=coord:${this.store.lat},${this.store.lng};title:${encodeURIComponent(this.store.store_name)};addr:${encodeURIComponent(this.store.address || '')}`;
+            },
+            baiduMapUrl() {
+                return `https://api.map.baidu.com/marker?location=${this.store.lat},${this.store.lng}&title=${encodeURIComponent(this.store.store_name)}&content=${encodeURIComponent(this.store.address || '')}&output=html`;
+            }
+        },
+        methods: {
+            saveToken() {
+                localStorage.setItem('kinoko_action_token', this.token);
+            },
+            confirmDelete(e) {
+                if (!this.token) {
+                    alert('请先填写Token');
+                    e.preventDefault();
+                    return;
+                }
+                if (!confirm('确定要彻底删除这个机厅吗？此操作无法撤销！')) {
+                    e.preventDefault();
+                }
+            },
+            formatDate(dateStr) {
+                if (!dateStr) return '未知';
+                return new Date(dateStr).toLocaleDateString('zh-CN');
+            },
+            startEditDrum(drum) {
+                this.editingDrumId = drum._id;
+                this.editDrumData = {
+                    p1_o_l: drum.p1_o_l || '',
+                    p1_x_l: drum.p1_x_l || '',
+                    p1_o_r: drum.p1_o_r || '',
+                    p1_x_r: drum.p1_x_r || '',
+                    p1_audio: drum.p1_audio !== undefined ? drum.p1_audio : 4,
+                    p2_o_l: drum.p2_o_l || '',
+                    p2_x_l: drum.p2_x_l || '',
+                    p2_o_r: drum.p2_o_r || '',
+                    p2_x_r: drum.p2_x_r || '',
+                    p2_audio: drum.p2_audio !== undefined ? drum.p2_audio : 4,
+                    screen: drum.screen || 'nom',
+                    track_no: drum.track_no || 1,
+                    comm: drum.comm || ''
+                };
+            },
+            deleteDrum(drumId) {
+                if (!this.token) {
+                    alert('请先填写Token');
+                    return;
+                }
+                if (!confirm('确定要删除此鼓框体吗？')) {
+                    return;
+                }
+                const form = document.getElementById('deleteDrumForm');
+                form.action = `/store/${this.store.id || this.store._id}/drum/${drumId}/delete`;
+                form.querySelector('input[name="token"]').value = this.token;
+                form.submit();
+            },
+            getDrumFace(drum, player, face) {
+                const key = DRUM_FACE_MAP[player]?.[face];
+                return key ? (drum[key] || '') : '';
+            },
+            getFrameClass(drum) {
+                const cond1 = drum.overall_cond_1p || 'nom';
+                const cond2 = drum.overall_cond_2p || 'nom';
+                if (cond1 === 'gold' || cond2 === 'gold') return 'j-pop';
+                if (cond1 === 'good' || cond2 === 'good') return 'anime';
+                if (cond1 === 'good-' || cond2 === 'good-') return 'vocaloid';
+                if (cond1 === 'nom' && cond2 === 'nom') return 'vari';
+                if (cond1 === 'nom-' || cond2 === 'nom-') return 'classic';
+                if (cond1 === 'bad' || cond2 === 'bad') return 'game';
+                return 'vari';
+            },
+            getAudioClass(audio) {
+                if (audio === 0) return 'off';
+                if (audio <= 2) return 'down';
+                if (audio <= 4) return 'up';
+                return 'up vol-gold';
+            },
+            getAudioEmoji(audio) {
+                if (audio === -1) return '🔇';
+                if (audio === 0) return '❓';
+                if (audio <= 2) return '🔉';
+                if (audio <= 4) return '🔊';
+                return '🔊';
+            },
+            getScreenExp(screen) {
+                return SCREEN_MAP[screen] || SCREEN_MAP['nom'];
+            },
+            getAudioDesc(p1, p2) {
+                const getDesc = (v) => {
+                    if (v === -1) return '无声';
+                    if (v === 0) return '暂无信息';
+                    if (v <= 2) return '小';
+                    if (v <= 4) return '中';
+                    return '大';
+                };
+                return `音响：1P ${getDesc(p1)} / 2P ${getDesc(p2)}`;
+            },
+            getCondText(val) {
+                return COND_TEXT_MAP[val] || '可';
+            },
+            getCondColor(val) {
+                return COND_COLOR_MAP[val] || '#9e9e9e';
+            }
+        }
+    }).mount('#app');
+</script>
+{% endblock %}

@@ -1,0 +1,6 @@
+太鼓地图/
+
+# python 
+__pycache__/
+.env
+.venv/

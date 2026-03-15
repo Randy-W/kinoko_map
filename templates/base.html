@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}菌菌太鼓机厅收集{% endblock %}</title>
+    <script src="/static/js/vue.global.min.js?v=1"></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260313e">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div id="app" class="app-container">
+        <header class="navbar">
+            <div class="container">
+                <a href="/" class="brand">菌菌太鼓机厅收集</a>
+                <nav>
+                    <a href="/" class="nav-link">首页</a>
+                    <a href="/store/add" class="nav-link">➕ 新增机厅</a>
+                </nav>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="container">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <p>&copy; 2026 Kinoko Map - 仅供太鼓达人爱好者交流使用 | 数据仅供参考</p>
+            </div>
+        </footer>
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

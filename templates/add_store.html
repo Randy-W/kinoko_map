@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}新增机厅 - 菌菌太鼓机厅收集{% endblock %}
+
+{% block content %}
+<div class="detail-header">
+    <div style="margin-bottom: 1rem;">
+        <a href="/" style="color: var(--primary-color); text-decoration: none;">&larr; 返回首页</a>
+    </div>
+    <h1>新增机厅</h1>
+    <p style="color: var(--text-muted);">请输入机厅信息，系统将自动根据地址获取坐标和生成ID。信息尽量和公众号店铺列表一致。</p>
+</div>
+
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+    <form action="/store/add" method="post">
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">机厅名称 *</label>
+            <input type="text" name="store_name" required placeholder="机厅名+地区 确保唯一" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;">
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">详细地址 *</label>
+            <input type="text" name="address" required placeholder="请尽可能详细，从省市区到门牌号" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem;">经纬度和区域码将根据此地址自动生成</div>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">价格/币数</label>
+            <input type="text" name="price_range" placeholder="例如：2币/3元" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;">
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">营业时间</label>
+            <input type="text" name="business_hours" placeholder="例如：10:00 - 22:00" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;">
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <div style="flex: 1; margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">机台数量 (台)</label>
+                <input type="number" name="cab_count" value="1" min="0" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;">
+            </div>
+            
+            <div style="flex: 1; margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">状态</label>
+                <select name="available" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;">
+                    <option value="true" selected>营业中</option>
+                    <option value="false">已撤机</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 1rem; margin-top: 1.5rem; border-top: 1px dashed #eee; padding-top: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: bold; color: var(--text-color);">操作令牌 (Token) *</label>
+            <div style="display: flex; gap: 0.5rem;">
+                <input type="text" id="token_input" name="token" required placeholder="请输入操作Token" style="flex: 1; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px; font-family: monospace;">
+                <button type="button" onclick="checkToken()" style="padding: 0 1rem; border: 1px solid #ddd; background: #f5f5f5; border-radius: 8px; cursor: pointer;">检查剩余次数</button>
+            </div>
+            <div id="token_msg" style="font-size: 0.85rem; margin-top: 0.4rem; color: var(--text-muted);">Token将保存在本地，无需重复输入</div>
+        </div>
+
+        <div style="margin-top: 2rem;">
+            <button type="submit" style="background: var(--primary-color); color: white; border: none; padding: 1rem 2rem; border-radius: 8px; font-size: 1rem; cursor: pointer; width: 100%;">提交新增</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Simple logic to handle Token persistence
+    const tokenInput = document.getElementById('token_input');
+    const savedToken = localStorage.getItem('kinoko_action_token');
+    if (savedToken) {
+        tokenInput.value = savedToken;
+    }
+
+    tokenInput.addEventListener('change', (e) => {
+        localStorage.setItem('kinoko_action_token', e.target.value.trim());
+    });
+
+    function checkToken() {
+        const token = tokenInput.value.trim();
+        const msg = document.getElementById('token_msg');
+        if (!token) {
+            msg.innerText = "请先输入Token";
+            msg.style.color = "red";
+            return;
+        }
+        
+        fetch(`/api/token_info?token=${token}`)
+            .then(res => {
+                if (!res.ok) throw new Error("无效的Token");
+                return res.json();
+            })
+            .then(data => {
+                if (data.valid) {
+                    msg.innerText = `Token有效！剩余次数: ${data.remaining_uses}`;
+                    msg.style.color = "green";
+                    localStorage.setItem('kinoko_action_token', token);
+                } else {
+                    msg.innerText = "Token无效或已过期";
+                    msg.style.color = "red";
+                }
+            })
+            .catch(err => {
+                msg.innerText = "Token无效或查询失败";
+                msg.style.color = "red";
+            });
+    }
+</script>
+{% endblock %}

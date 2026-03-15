@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="home-header" style="margin-bottom: 2rem; text-align: center;">
+    <h1 style="font-size: 1.8rem; margin-bottom: 0.5rem;">全国太鼓达人机厅分布</h1>
+    <p style="color: var(--text-muted); font-size: 1rem;">
+        共收录 [[ totalGlobalCount ]] 家机厅 • 
+        覆盖 [[ locations.length ]] 个省级行政区
+    </p>
+</div>
+
+<!-- Vue Template controlled by #app in base.html but we need to mix data here -->
+<!-- Since we mounted #app on body in base.html, we can just write Vue template syntax here -->
+<!-- BUT, we need to inject the data. -->
+
+<div class="province-list">
+    <div v-for="(prov, index) in locations" :key="prov._id" class="province-group">
+        <div class="province-header" @click="toggle(index)">
+            <div class="province-title">
+                [[ prov._id || '其他区域' ]]
+            </div>
+            <div style="display:flex; align-items:center; gap: 1rem;">
+                <span class="tag">[[ getProvinceCount(prov) ]]</span>
+                <span class="toggle-icon" :style="{ transform: isOpen(index) ? 'rotate(180deg)' : 'rotate(0)' }" style="transition: transform 0.3s; display: inline-block;">▼</span>
+            </div>
+        </div>
+        
+        <div class="city-list" v-show="isOpen(index)">
+            <a 
+                v-for="city in prov.cities" 
+                :href="getCityLink(prov._id, city.name)" 
+                class="city-item"
+            >
+                <div>[[ city.name || '未知城市' ]]</div>
+                <span class="city-count">[[ city.count ]] 家</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const serverData = {{ locations | tojson | safe }};
+    
+    const { createApp } = Vue;
+
+    createApp({
+        delimiters: ['[[', ']]'],
+        data() {
+            return {
+                locations: serverData,
+                openIndices: []
+            }
+        },
+        computed: {
+            totalGlobalCount() {
+                return this.locations.reduce((acc, prov) => acc + this.getProvinceCount(prov), 0);
+            }
+        },
+        methods: {
+            toggle(index) {
+                if (this.openIndices.includes(index)) {
+                    this.openIndices = this.openIndices.filter(i => i !== index);
+                } else {
+                    this.openIndices.push(index);
+                }
+            },
+            isOpen(index) {
+                return this.openIndices.includes(index);
+            },
+            getProvinceCount(prov) {
+                return prov.cities.reduce((sum, c) => sum + c.count, 0);
+            },
+            getCityLink(prov, city) {
+                const p = prov || 'unknown';
+                const c = city || 'unknown';
+                return `/city/${encodeURIComponent(p)}/${encodeURIComponent(c)}`;
+            }
+        }
+    }).mount('#app');
+</script>
+{% endblock %}
