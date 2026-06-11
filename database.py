@@ -91,15 +91,15 @@ class Drum(Document):
 
 class ArcadeStore(Document):
     id: str = Field(unique=True)
-    province: Optional[str]
-    city: Optional[str]
-    district: Optional[str]
-    store_name: Optional[str]
-    address: Optional[str]
-    name: Optional[str]
-    lat: Optional[float]
-    lng: Optional[float]
-    abcode: Optional[str]
+    province: Optional[str] = None
+    city: Optional[str] = None
+    district: Optional[str] = None
+    store_name: Optional[str] = None
+    address: Optional[str] = None
+    name: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    abcode: Optional[str] = None
     price_range: Optional[str] = None
     business_hours: Optional[str] = None
     local_group: Optional[str] = None

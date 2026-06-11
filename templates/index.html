@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="home-header" style="margin-bottom: 2rem; text-align: center;">
+<div class="home-header" style="margin-bottom: 1.5rem; text-align: center;">
     <h1 style="font-size: 1.8rem; margin-bottom: 0.5rem;">全国太鼓达人机厅分布</h1>
     <p style="color: var(--text-muted); font-size: 1rem;">
         共收录 [[ totalGlobalCount ]] 家机厅 • 
@@ -9,31 +9,95 @@
     </p>
 </div>
 
-<!-- Vue Template controlled by #app in base.html but we need to mix data here -->
-<!-- Since we mounted #app on body in base.html, we can just write Vue template syntax here -->
-<!-- BUT, we need to inject the data. -->
+<div class="search-section">
+    <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input 
+            type="text" 
+            v-model="searchQuery" 
+            placeholder="搜索省份或城市..." 
+            class="search-input"
+            @input="onSearch"
+        >
+        <button v-if="searchQuery" @click="clearSearch" class="search-clear">✕</button>
+    </div>
+</div>
 
-<div class="province-list">
-    <div v-for="(prov, index) in locations" :key="prov._id" class="province-group">
-        <div class="province-header" @click="toggle(index)">
-            <div class="province-title">
-                [[ prov._id || '其他区域' ]]
+<div v-if="searchQuery && searchResults.length > 0" class="search-results">
+    <h3 style="margin-bottom: 0.8rem; color: var(--text-muted); font-size: 0.9rem;">搜索结果</h3>
+    <div class="search-results-grid">
+        <a 
+            v-for="result in searchResults" 
+            :key="result.province + '-' + result.city"
+            :href="result.link" 
+            class="search-result-item"
+        >
+            <div class="result-main">
+                <span class="result-city">[[ result.city ]]</span>
+                <span class="result-province">[[ result.province ]]</span>
             </div>
-            <div style="display:flex; align-items:center; gap: 1rem;">
-                <span class="tag">[[ getProvinceCount(prov) ]]</span>
-                <span class="toggle-icon" :style="{ transform: isOpen(index) ? 'rotate(180deg)' : 'rotate(0)' }" style="transition: transform 0.3s; display: inline-block;">▼</span>
-            </div>
-        </div>
-        
-        <div class="city-list" v-show="isOpen(index)">
+            <span class="result-count">[[ result.count ]] 家</span>
+        </a>
+    </div>
+</div>
+
+<div v-if="searchQuery && searchResults.length === 0" class="no-results">
+    未找到匹配的地区
+</div>
+
+<div v-if="!searchQuery">
+    <div class="hot-cities-section" v-if="hotCities.length > 0">
+        <h3 style="margin-bottom: 0.8rem; color: var(--text-muted); font-size: 0.9rem;">热门城市</h3>
+        <div class="hot-cities-grid">
             <a 
-                v-for="city in prov.cities" 
-                :href="getCityLink(prov._id, city.name)" 
-                class="city-item"
+                v-for="city in hotCities" 
+                :key="city.province + '-' + city.name"
+                :href="city.link" 
+                class="hot-city-item"
             >
-                <div>[[ city.name || '未知城市' ]]</div>
-                <span class="city-count">[[ city.count ]] 家</span>
+                <span class="hot-city-name">[[ city.name ]]</span>
+                <span class="hot-city-count">[[ city.count ]]</span>
             </a>
+        </div>
+    </div>
+
+    <div class="region-list">
+        <div v-for="region in regionsWithProvinces" :key="region.name" class="region-group">
+            <div class="region-header" @click="toggleRegion(region.name)">
+                <div class="region-title">
+                    <span class="region-icon">[[ region.icon ]]</span>
+                    [[ region.name ]]
+                </div>
+                <div style="display:flex; align-items:center; gap: 1rem;">
+                    <span class="tag">[[ getRegionCount(region) ]]</span>
+                    <span class="toggle-icon" :style="{ transform: isRegionOpen(region.name) ? 'rotate(180deg)' : 'rotate(0)' }" style="transition: transform 0.3s; display: inline-block;">▼</span>
+                </div>
+            </div>
+            
+            <div class="province-list" v-show="isRegionOpen(region.name)">
+                <div v-for="(prov, index) in region.provinces" :key="prov._id" class="province-group">
+                    <div class="province-header" @click="toggleProvince(region.name, prov._id)">
+                        <div class="province-title">
+                            [[ prov._id || '其他区域' ]]
+                        </div>
+                        <div style="display:flex; align-items:center; gap: 1rem;">
+                            <span class="tag tag-small">[[ getProvinceCount(prov) ]]</span>
+                            <span class="toggle-icon toggle-icon-small" :style="{ transform: isProvinceOpen(region.name, prov._id) ? 'rotate(180deg)' : 'rotate(0)' }" style="transition: transform 0.3s; display: inline-block;">▼</span>
+                        </div>
+                    </div>
+                    
+                    <div class="city-list" v-show="isProvinceOpen(region.name, prov._id)">
+                        <a 
+                            v-for="city in prov.cities" 
+                            :href="getCityLink(prov._id, city.name)" 
+                            class="city-item"
+                        >
+                            <div>[[ city.name || '未知城市' ]]</div>
+                            <span class="city-count">[[ city.count ]] 家</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -44,6 +108,17 @@
 <script>
     const serverData = {{ locations | tojson | safe }};
     
+    const REGION_MAP = {
+        '华北': { icon: '', provinces: ['北京市', '天津市', '河北省', '山西省', '内蒙古自治区'] },
+        '东北': { icon: '', provinces: ['辽宁省', '吉林省', '黑龙江省'] },
+        '华东': { icon: '', provinces: ['上海市', '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省'] },
+        '华中': { icon: '', provinces: ['河南省', '湖北省', '湖南省'] },
+        '华南': { icon: '', provinces: ['广东省', '广西壮族自治区', '海南省'] },
+        '西南': { icon: '', provinces: ['重庆市', '四川省', '贵州省', '云南省', '西藏自治区'] },
+        '西北': { icon: '', provinces: ['陕西省', '甘肃省', '青海省', '宁夏回族自治区', '新疆维吾尔自治区'] },
+        '港澳台': { icon: '', provinces: ['香港市', '澳门市', '台湾省'] }
+    };
+
     const { createApp } = Vue;
 
     createApp({
@@ -51,27 +126,132 @@
         data() {
             return {
                 locations: serverData,
-                openIndices: []
+                searchQuery: '',
+                searchResults: [],
+                openRegions: [],
+                openProvinces: {}
             }
         },
         computed: {
             totalGlobalCount() {
                 return this.locations.reduce((acc, prov) => acc + this.getProvinceCount(prov), 0);
+            },
+            hotCities() {
+                const cities = [];
+                this.locations.forEach(prov => {
+                    prov.cities.forEach(city => {
+                        cities.push({
+                            name: city.name || '未知城市',
+                            province: prov._id || '其他区域',
+                            count: city.count,
+                            link: this.getCityLink(prov._id, city.name)
+                        });
+                    });
+                });
+                return cities.sort((a, b) => b.count - a.count).slice(0, 8);
+            },
+            regionsWithProvinces() {
+                const regions = [];
+                const provinceToRegion = {};
+                
+                Object.entries(REGION_MAP).forEach(([regionName, regionData]) => {
+                    regionData.provinces.forEach(prov => {
+                        provinceToRegion[prov] = regionName;
+                    });
+                });
+                
+                const grouped = {};
+                this.locations.forEach(prov => {
+                    const provName = prov._id || '';
+                    let regionName = provinceToRegion[provName];
+                    if (!regionName) {
+                        regionName = '其他';
+                    }
+                    if (!grouped[regionName]) {
+                        grouped[regionName] = [];
+                    }
+                    grouped[regionName].push(prov);
+                });
+                
+                Object.keys(REGION_MAP).forEach(regionName => {
+                    if (grouped[regionName] && grouped[regionName].length > 0) {
+                        regions.push({
+                            name: regionName,
+                            icon: REGION_MAP[regionName].icon,
+                            provinces: grouped[regionName]
+                        });
+                    }
+                });
+                
+                if (grouped['其他'] && grouped['其他'].length > 0) {
+                    regions.push({
+                        name: '其他',
+                        icon: '📍',
+                        provinces: grouped['其他']
+                    });
+                }
+                
+                return regions;
             }
         },
         methods: {
-            toggle(index) {
-                if (this.openIndices.includes(index)) {
-                    this.openIndices = this.openIndices.filter(i => i !== index);
+            onSearch() {
+                if (!this.searchQuery.trim()) {
+                    this.searchResults = [];
+                    return;
+                }
+                
+                const query = this.searchQuery.toLowerCase().trim();
+                const results = [];
+                
+                this.locations.forEach(prov => {
+                    const provName = (prov._id || '').toLowerCase();
+                    prov.cities.forEach(city => {
+                        const cityName = (city.name || '').toLowerCase();
+                        if (provName.includes(query) || cityName.includes(query)) {
+                            results.push({
+                                province: prov._id || '其他区域',
+                                city: city.name || '未知城市',
+                                count: city.count,
+                                link: this.getCityLink(prov._id, city.name)
+                            });
+                        }
+                    });
+                });
+                
+                this.searchResults = results.slice(0, 20);
+            },
+            clearSearch() {
+                this.searchQuery = '';
+                this.searchResults = [];
+            },
+            toggleRegion(regionName) {
+                if (this.openRegions.includes(regionName)) {
+                    this.openRegions = this.openRegions.filter(r => r !== regionName);
                 } else {
-                    this.openIndices.push(index);
+                    this.openRegions.push(regionName);
                 }
             },
-            isOpen(index) {
-                return this.openIndices.includes(index);
+            isRegionOpen(regionName) {
+                return this.openRegions.includes(regionName);
+            },
+            toggleProvince(regionName, provId) {
+                const key = `${regionName}-${provId}`;
+                if (this.openProvinces[key]) {
+                    this.openProvinces[key] = false;
+                } else {
+                    this.openProvinces[key] = true;
+                }
+                this.openProvinces = { ...this.openProvinces };
+            },
+            isProvinceOpen(regionName, provId) {
+                return this.openProvinces[`${regionName}-${provId}`];
             },
             getProvinceCount(prov) {
                 return prov.cities.reduce((sum, c) => sum + c.count, 0);
+            },
+            getRegionCount(region) {
+                return region.provinces.reduce((sum, prov) => sum + this.getProvinceCount(prov), 0);
             },
             getCityLink(prov, city) {
                 const p = prov || 'unknown';

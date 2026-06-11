@@ -152,6 +152,7 @@ async def add_store(
     address: str = Form(...),
     price_range: Optional[str] = Form(None),
     business_hours: Optional[str] = Form(None),
+    local_group: Optional[str] = Form(None),
     cab_count: int = Form(1),
     available: bool = Form(True),
     token: str = Form(...)
@@ -213,6 +214,7 @@ async def add_store(
         lng=lng,
         price_range=price_range,
         business_hours=business_hours,
+        local_group=local_group,
         cab_count=cab_count,
         available=available
     )

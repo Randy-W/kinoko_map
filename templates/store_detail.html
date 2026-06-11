@@ -10,6 +10,10 @@
     
     <div style="display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;">
         <h1 style="font-size: 1.8rem; line-height: 1.2; margin: 0;">[[ store.store_name ]]</h1>
+        <button @click="copyBindCommand" class="copy-bind-btn" title="复制菌菌绑定指令">
+            <span v-if="!copySuccess">复制菌菌绑定指令</span>
+            <span v-else>✓ 已复制</span>
+        </button>
         <!-- <span class="tag" style="font-size: 1rem; padding: 0.3rem 0.8rem; background: #e3f2fd; color: #1565c0;">
             [[ (store.cab_count === -1) ? '机台数未知' : (store.cab_count + ' 台') ]]
         </span> -->
@@ -501,7 +505,8 @@
                     local_group: storeData.local_group,
                     cab_count: storeData.cab_count,
                     available: storeData.available
-                }
+                },
+                copySuccess: false
             }
         },
         mounted() {
@@ -532,12 +537,50 @@
                 return `https://apis.map.qq.com/uri/v1/marker?marker=coord:${this.store.lat},${this.store.lng};title:${encodeURIComponent(this.store.store_name)};addr:${encodeURIComponent(this.store.address || '')}`;
             },
             baiduMapUrl() {
-                return `https://api.map.baidu.com/marker?location=${this.store.lat},${this.store.lng}&title=${encodeURIComponent(this.store.store_name)}&content=${encodeURIComponent(this.store.address || '')}&output=html`;
+                const address = this.store.address || this.store.store_name;
+                return `https://api.map.baidu.com/geocoder?address=${encodeURIComponent(address)}&output=html`;
             }
         },
         methods: {
             saveToken() {
                 localStorage.setItem('kinoko_action_token', this.token);
+            },
+            copyBindCommand() {
+                const storeId = this.store.id || this.store._id;
+                const command = `/绑定机厅 ${storeId} `;
+                
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(command).then(() => {
+                        this.copySuccess = true;
+                        setTimeout(() => {
+                            this.copySuccess = false;
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('复制失败:', err);
+                        this.fallbackCopy(command);
+                    });
+                } else {
+                    this.fallbackCopy(command);
+                }
+            },
+            fallbackCopy(text) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    this.copySuccess = true;
+                    setTimeout(() => {
+                        this.copySuccess = false;
+                    }, 2000);
+                } catch (err) {
+                    console.error('复制失败:', err);
+                    alert('复制失败，请手动复制: ' + text);
+                }
+                document.body.removeChild(textarea);
             },
             confirmDelete(e) {
                 if (!this.token) {
